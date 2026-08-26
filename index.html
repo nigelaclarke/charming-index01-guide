@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Wearable voice input for personal apps</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        :root {
+            --ink: #0E1420;
+            --ink-2: #161F2E;
+            --brass: #D9A441;
+            --steel: #7E93A8;
+            --paper: #E9EEF4;
+            --muted: #7C8CA0;
+            --line: #1F2937;
+            --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Charter, Georgia, serif;
+            --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        html,
+        body {
+            height: 100%;
+            background: var(--ink);
+            overflow: hidden
+        }
+
+        body {
+            font-family: var(--ui);
+            color: var(--paper);
+            -webkit-font-smoothing: antialiased
+        }
+
+        body.idle {
+            cursor: none
+        }
+
+        #stage {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 1600px;
+            height: var(--stage-h, 900px);
+            transform-origin: center center;
+            background:
+                radial-gradient(660px 500px at 87% 52%, rgba(217, 164, 65, .062), transparent 72%),
+                radial-gradient(620px 460px at 13% 52%, rgba(126, 147, 168, .048), transparent 72%),
+                var(--ink);
+        }
+
+        /* ---- masthead: two columns across the full measure ---- */
+        h1 {
+            position: absolute;
+            left: 64px;
+            top: 66px;
+            width: 780px;
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 54px;
+            line-height: 1.08;
+            letter-spacing: -.016em;
+        }
+
+        h1 em {
+            font-style: normal;
+            color: var(--brass)
+        }
+
+        /* the lede block is placed once; the lines inside it flow */
+        .lede {
+            position: absolute;
+            left: 976px;
+            top: 92px;
+            width: 560px;
+        }
+
+        .sub {
+            font-size: 19px;
+            line-height: 1.55;
+            color: var(--muted);
+        }
+
+        .rule {
+            position: absolute;
+            left: 64px;
+            top: 220px;
+            width: 1472px;
+            height: 1px;
+            background: var(--line)
+        }
+
+        /* header pins to the top of the stage, feet to the bottom, this to the middle */
+        #core {
+            position: absolute;
+            left: 0;
+            top: calc((var(--stage-h, 900px) - 900px) / 2);
+            width: 1600px;
+            height: 900px;
+        }
+
+        #wires {
+            position: absolute;
+            inset: 0;
+            width: 1600px;
+            height: 900px;
+            z-index: 1
+        }
+
+        /* ---- app stack ---- */
+        .stack {
+            position: absolute;
+            left: 470px;
+            top: 258px;
+            width: 660px;
+            z-index: 2
+        }
+
+        .card {
+            height: 92px;
+            margin-bottom: 20px;
+            background: linear-gradient(180deg, var(--ink-2), #131B28);
+            border: 1px solid #243141;
+            border-radius: 13px;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 0 24px;
+            transition: border-color .5s ease, background .5s ease, transform .5s ease;
+        }
+
+        .card:last-child {
+            margin-bottom: 0
+        }
+
+        .card.live {
+            border-color: rgba(217, 164, 65, .6);
+            background: linear-gradient(180deg, #1C2436, #161E2C);
+            transform: translateX(-4px);
+        }
+
+        .say {
+            flex: 1;
+            text-align: right;
+            font-family: var(--mono);
+            font-size: 15px;
+            color: var(--brass);
+            opacity: .2;
+            transition: opacity .45s ease;
+            white-space: nowrap;
+        }
+
+        .card.live .say {
+            opacity: 1
+        }
+
+        .meta {
+            flex: 0 0 176px
+        }
+
+        .name {
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: -.01em
+        }
+
+        .kind {
+            font-size: 12.5px;
+            color: var(--muted);
+            margin-top: 3px
+        }
+
+        .glyph {
+            flex: 0 0 36px;
+            height: 36px;
+            opacity: .85
+        }
+
+        .card.live .glyph {
+            opacity: 1
+        }
+
+        .wordmark {
+            font-family: var(--ui);
+            font-weight: 650;
+            font-size: 24px;
+            letter-spacing: -.025em;
+            color: var(--paper);
+        }
+
+        /* ---- flanking columns, both 200px tall, both centred on the band ---- */
+        .side {
+            position: absolute;
+            top: 326px;
+            width: 300px;
+            z-index: 2;
+            text-align: center
+        }
+
+        .side.voice {
+            left: 1236px
+        }
+
+        .side.screen {
+            left: 64px
+        }
+
+        .side .label {
+            font-family: var(--mono);
+            font-size: 13px;
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            margin-top: 18px;
+        }
+
+        .side.voice .label {
+            color: var(--brass)
+        }
+
+        .side.screen .label {
+            color: var(--brass)
+        }
+
+        .side .note {
+            font-size: 14.5px;
+            color: var(--muted);
+            margin-top: 8px;
+            line-height: 1.45
+        }
+
+        .brandline {
+            margin-bottom: 18px;
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 11px
+        }
+
+        .brandline .wordmark {
+            font-size: 21px
+        }
+
+        .brandline .model {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--muted);
+            letter-spacing: .1em;
+        }
+
+        /* ---- bottom row, both blocks share a baseline ---- */
+        .foot {
+            position: absolute;
+            bottom: 60px;
+            width: 300px;
+            z-index: 2;
+            text-align: center
+        }
+
+        .foot.next {
+            left: 1236px;
+            opacity: .4
+        }
+
+        .foot.qr {
+            left: 64px
+        }
+
+        .foot .cap {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+
+        .qr .panel {
+            width: 92px;
+            height: 92px;
+            margin: 0 auto;
+            padding: 7px;
+            background: #C4CFDB;
+            border-radius: 8px;
+            opacity: .66;
+        }
+
+        .qr .panel svg {
+            display: block;
+            width: 78px;
+            height: 78px
+        }
+
+        .qr .cap {
+            color: #556577
+        }
+
+        .qr .cap a {
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color .18s ease, color .18s ease;
+        }
+
+        .qr .cap a:hover,
+        .qr .cap a:focus-visible {
+            color: var(--steel);
+            border-bottom-color: currentColor;
+        }
+
+        @media (prefers-reduced-motion:reduce) {
+            .say {
+                opacity: .62
+            }
+
+            .card,
+            .card.live {
+                transform: none
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="stage">
+
+        <h1>Wearable voice input<br>for <em>personal apps</em>.</h1>
+        <div class="lede">
+            <p class="sub">Charming turns an idea into an app.</p>
+            <p class="sub">Pebble Index 01 puts that app in a ring.</p>
+        </div>
+        <div class="rule"></div>
+
+        <!-- the diagram core keeps its own 1600x900 frame and rides the vertical centre -->
+        <div id="core">
+            <svg id="wires" viewBox="0 0 1600 900" fill="none" aria-hidden="true">
+                <defs>
+                    <radialGradient id="pulseGlow">
+                        <stop offset="0%" stop-color="#F0C267" stop-opacity="1" />
+                        <stop offset="100%" stop-color="#D9A441" stop-opacity="0" />
+                    </radialGradient>
+                </defs>
+
+                <path id="w0" d="M1306 472 C 1240 472, 1208 304, 1130 304" stroke="#4A3A1C" stroke-width="1.2" />
+                <path id="w1" d="M1306 472 C 1240 472, 1208 416, 1130 416" stroke="#4A3A1C" stroke-width="1.2" />
+                <path id="w2" d="M1306 472 C 1240 472, 1208 528, 1130 528" stroke="#4A3A1C" stroke-width="1.2" />
+                <path id="w3" d="M1306 472 C 1240 472, 1208 640, 1130 640" stroke="#4A3A1C" stroke-width="1.2" />
+
+                <!-- left wires mirror the right: card edge -> screen, so the dot runs outward -->
+                <path id="l0" d="M470 304 C 407 304, 381 472, 328 472" stroke="#4A3A1C" stroke-width="1.2" />
+                <path id="l1" d="M470 416 C 407 416, 381 472, 328 472" stroke="#4A3A1C" stroke-width="1.2" />
+                <path id="l2" d="M470 528 C 407 528, 381 472, 328 472" stroke="#4A3A1C" stroke-width="1.2" />
+                <path id="l3" d="M470 640 C 407 640, 381 472, 328 472" stroke="#4A3A1C" stroke-width="1.2" />
+
+                <rect id="shalo" x="248" y="394" width="84" height="156" rx="18" stroke="#D9A441" stroke-width="1.5"
+                    opacity="0" />
+
+                <circle id="halo" cx="1386" cy="472" r="82" stroke="#D9A441" stroke-width="1.5" opacity="0" />
+                <circle id="glow" r="16" fill="url(#pulseGlow)" opacity="0" />
+                <circle id="dot" r="4" fill="#F2C86E" opacity="0" />
+            </svg>
+
+            <div class="stack" id="stack"></div>
+
+            <div class="side screen">
+                <!-- ===== LOGO SLOT A: swap the span for the charming SVG ===== -->
+                <div class="brandline">
+                    <span class="wordmark">charming</span>
+                </div>
+                <svg width="260" height="200" viewBox="0 0 260 200" fill="none">
+                    <!-- laptop follows: same apps, secondary surface -->
+                    <rect x="30" y="62" width="108" height="68" rx="6" stroke="#7A5F2A" stroke-width="2" />
+                    <rect x="39" y="71" width="90" height="50" rx="2" fill="#182231" />
+                    <path d="M20 140 H148" stroke="#7A5F2A" stroke-width="2" stroke-linecap="round" />
+                    <!-- phone leads: charming is phone-first, and the wires land on its edge -->
+                    <rect x="168" y="26" width="76" height="148" rx="14" stroke="#D9A441" stroke-width="2.5" />
+                    <rect x="177" y="40" width="58" height="120" rx="4" fill="#182231" />
+                </svg>
+                <div class="label">Fidelity</div>
+                <div class="note">Dive into the full apps<br>on mobile and web</div>
+            </div>
+
+            <div class="side voice">
+                <!-- ===== LOGO SLOT B: swap the span for the pebble SVG ===== -->
+                <div class="brandline">
+                    <span class="wordmark">pebble</span>
+                    <span class="model">INDEX 01</span>
+                </div>
+                <svg width="220" height="200" viewBox="-110 -100 220 200" fill="none">
+                    <circle cx="0" cy="0" r="80" fill="#18212F" stroke="#D9A441" stroke-width="3" />
+                    <circle cx="0" cy="0" r="51" fill="#0E1420" stroke="#7A5F2A" stroke-width="2" />
+                    <rect x="-23" y="-97" width="46" height="23" rx="9" fill="#241C0C" stroke="#D9A441"
+                        stroke-width="2.5" />
+                    <circle cx="0" cy="-85" r="3.4" fill="#F2C86E" />
+                </svg>
+                <div class="label">Immediacy</div>
+                <div class="note">Agentic voice input without<br>unlocking your phone</div>
+            </div>
+        </div>
+
+        <div class="foot next">
+            <svg width="230" height="48" viewBox="0 0 230 48" fill="none" stroke="#8C9DB1" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="6" y="14" width="26" height="19" rx="7" />
+                <rect x="40" y="14" width="26" height="19" rx="7" />
+                <path d="M32 21 c3 -3 5 -3 8 0" />
+                <path d="M6 18 L0 13" />
+                <path d="M66 18 L72 13" />
+                <g transform="translate(108,15) rotate(-12)">
+                    <ellipse cx="0" cy="0" rx="9" ry="8.5" />
+                    <path d="M-4.5 7 V18 a4.5 4.5 0 0 0 9 0 V7" />
+                    <circle cx="0" cy="0" r="2.6" />
+                </g>
+                <g transform="translate(132,15) rotate(12)">
+                    <ellipse cx="0" cy="0" rx="9" ry="8.5" />
+                    <path d="M-4.5 7 V18 a4.5 4.5 0 0 0 9 0 V7" />
+                    <circle cx="0" cy="0" r="2.6" />
+                </g>
+                <rect x="186" y="12" width="30" height="28" rx="8" />
+                <path d="M193 12 V4 h16 v8" />
+                <path d="M193 40 v8 h16 v-8" />
+                <path d="M217 22 v6" />
+            </svg>
+            <div class="cap">Output comes next?</div>
+        </div>
+
+        <!-- ===== QR: encodes https://github.com/nigelaclarke/charming-index01-guide ===== -->
+        <div class="foot qr">
+            <div class="panel">
+                <svg viewBox="0 0 33 33" shape-rendering="crispEdges">
+                    <path stroke="#141C28"
+                        d="M0 0.5h7m5 0h1m3 0h1m1 0h4m1 0h1m2 0h7m-33 1h1m5 0h1m3 0h1m4 0h1m4 0h3m3 0h1m5 0h1m-33 1h1m1 0h3m1 0h1m1 0h4m2 0h1m3 0h1m2 0h2m3 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h4m3 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h7m1 0h6m2 0h1m1 0h3m1 0h1m-33 1h1m5 0h1m1 0h1m1 0h4m3 0h1m2 0h1m3 0h1m1 0h1m5 0h1m-33 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-25 1h2m1 0h2m1 0h1m1 0h1m4 0h1m-22 1h1m1 0h5m2 0h2m2 0h2m1 0h2m1 0h1m6 0h5m-31 1h4m5 0h2m2 0h1m2 0h1m1 0h3m2 0h1m2 0h2m1 0h2m1 0h1m-32 1h2m1 0h3m1 0h3m1 0h5m4 0h1m2 0h3m1 0h1m1 0h2m-32 1h1m2 0h1m1 0h1m4 0h4m1 0h1m3 0h3m2 0h1m1 0h1m1 0h5m-29 1h1m1 0h2m2 0h2m2 0h3m1 0h2m3 0h3m1 0h3m-29 1h1m3 0h1m1 0h2m1 0h2m1 0h1m1 0h1m2 0h3m1 0h2m2 0h1m4 0h2m-32 1h6m1 0h1m5 0h3m3 0h1m1 0h1m1 0h3m3 0h2m-32 1h1m1 0h1m4 0h4m1 0h1m1 0h2m4 0h2m1 0h1m1 0h6m-26 1h2m1 0h1m2 0h1m3 0h1m1 0h1m4 0h4m1 0h2m3 0h1m-33 1h1m2 0h2m2 0h1m2 0h2m2 0h1m1 0h1m1 0h4m1 0h1m2 0h2m1 0h2m1 0h1m-33 1h3m1 0h4m2 0h2m1 0h3m2 0h1m1 0h2m2 0h2m1 0h2m1 0h2m-32 1h1m1 0h1m1 0h2m1 0h1m1 0h2m4 0h2m1 0h4m3 0h8m-33 1h3m2 0h2m2 0h1m1 0h1m1 0h1m4 0h3m3 0h1m2 0h3m1 0h2m-33 1h1m1 0h3m4 0h1m1 0h2m1 0h10m2 0h1m3 0h1m1 0h1m-33 1h1m1 0h1m3 0h3m1 0h2m1 0h2m5 0h1m4 0h1m3 0h3m-32 1h1m1 0h1m4 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h5m1 0h3m1 0h3m1 0h1m-33 1h1m1 0h6m3 0h1m5 0h1m4 0h8m1 0h1m-24 1h2m4 0h1m1 0h4m1 0h1m1 0h2m3 0h1m1 0h1m1 0h1m-33 1h7m2 0h4m1 0h4m2 0h2m1 0h2m1 0h1m1 0h1m1 0h1m-31 1h1m5 0h1m1 0h5m1 0h1m2 0h2m1 0h5m3 0h4m-32 1h1m1 0h3m1 0h1m1 0h2m3 0h4m2 0h1m4 0h6m1 0h1m-32 1h1m1 0h3m1 0h1m1 0h6m1 0h1m2 0h3m2 0h3m2 0h1m1 0h3m-33 1h1m1 0h3m1 0h1m1 0h4m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m3 0h2m-28 1h1m5 0h1m2 0h4m1 0h2m4 0h3m2 0h2m1 0h3m-31 1h7m1 0h1m1 0h1m3 0h2m1 0h1m1 0h1m2 0h4m1 0h1m3 0h1" />
+                </svg>
+            </div>
+            <div class="cap"><a href="https://github.com/nigelaclarke/charming-index01-guide" target="_blank"
+                    rel="noopener noreferrer">More details on Github</a></div>
+        </div>
+
+    </div>
+
+    <script>
+        const APPS = [
+            {
+                name: "Live Marginal Emissions", kind: "Grid carbon timing",
+                say: "When is a good time to run the dryer?",
+                glyph: '<svg viewBox="0 0 40 40" fill="none"><rect x="20" y="6" width="8" height="28" fill="#3A2E14"/><path d="M3 26 L9 17 L14 24 L20 11 L26 20 L32 9 L37 15" stroke="#D9A441" stroke-width="2.2" stroke-linejoin="round"/></svg>'
+            },
+            {
+                name: "Hydration Log", kind: "Water against a goal",
+                say: "Log that I drank a bottle of water.",
+                glyph: '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="14" stroke="#334054" stroke-width="4"/><path d="M20 6 a14 14 0 0 1 11 22.4" stroke="#D9A441" stroke-width="4" stroke-linecap="round"/></svg>'
+            },
+            {
+                name: "Person of Interest", kind: "Curated rewatch path",
+                say: "What's my next Person of Interest episode?",
+                glyph: '<svg viewBox="0 0 40 40" fill="none"><path d="M4 11 h9 M4 20 h9 M4 29 h9" stroke="#334054" stroke-width="2.4" stroke-linecap="round"/><path d="M18 11 l4 4 l8-8 M18 20 l4 4 l8-8" stroke="#D9A441" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 29 h14" stroke="#334054" stroke-width="2.4" stroke-linecap="round"/></svg>'
+            },
+            {
+                name: "Notes", kind: "Whatever needs keeping",
+                say: "Note that I should follow up with Glen.",
+                glyph: '<svg viewBox="0 0 40 40" fill="none"><path d="M5 9 h30 M5 17 h30 M5 25 h22 M5 33 h13" stroke="#D9A441" stroke-width="2.4" stroke-linecap="round" opacity=".85"/></svg>'
+            }
+        ];
+
+        const stack = document.getElementById("stack");
+        stack.innerHTML = APPS.map((a, i) =>
+            '<div class="card" id="c' + i + '">' +
+            '<div class="glyph">' + a.glyph + '</div>' +
+            '<div class="meta"><div class="name">' + a.name + '</div><div class="kind">' + a.kind + '</div></div>' +
+            '<div class="say">' + a.say + '</div>' +
+            '</div>').join("");
+
+        const cards = APPS.map((_, i) => document.getElementById("c" + i));
+        const wires = APPS.map((_, i) => document.getElementById("w" + i));
+        const lwires = APPS.map((_, i) => document.getElementById("l" + i));
+        const dot = document.getElementById("dot"), glow = document.getElementById("glow");
+        const halo = document.getElementById("halo"), shalo = document.getElementById("shalo");
+
+        const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        /* one cycle: ring pulses -> card lights -> signal runs on to the screen, which pulses */
+        const TRAVEL = 900, HOLD = 1800, DWELL = 900, REST = 700;
+        const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        /* both endpoints pulse the same way; the screen halo is a rounded rect, the ring a circle */
+        function pulse(el, origin) {
+            el.setAttribute("opacity", "0.7");
+            el.style.transformOrigin = origin;
+            el.animate([{ transform: "scale(1)", opacity: .7 }, { transform: "scale(1.42)", opacity: 0 }],
+                { duration: 1100, easing: "cubic-bezier(.2,.6,.3,1)" }).onfinish = () => el.setAttribute("opacity", "0");
+        }
+
+        /* run the dot along a wire from its start to its end, lighting the wire as it goes */
+        function travel(path, done) {
+            const len = path.getTotalLength(), t0 = performance.now();
+            path.setAttribute("stroke", "#8A6C31");
+            (function step(now) {
+                const t = Math.min(1, (now - t0) / TRAVEL);
+                const p = path.getPointAtLength(ease(t) * len);
+                dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y);
+                glow.setAttribute("cx", p.x); glow.setAttribute("cy", p.y);
+                dot.setAttribute("opacity", t < .96 ? 1 : 0);
+                glow.setAttribute("opacity", t < .96 ? .85 : 0);
+                if (t < 1) requestAnimationFrame(step); else done();
+            })(t0);
+        }
+
+        function run(i) {
+            const right = wires[i], left = lwires[i];
+
+            // 1. you speak to the ring
+            pulse(halo, "1386px 472px");
+
+            // 2. the signal reaches the app
+            travel(right, () => {
+                cards[i].classList.add("live");
+                setTimeout(() => {
+                    // 3. and carries on into the full app on screen
+                    travel(left, () => {
+                        pulse(shalo, "290px 472px");
+                        setTimeout(() => {
+                            cards[i].classList.remove("live");
+                            right.setAttribute("stroke", "#4A3A1C");
+                            left.setAttribute("stroke", "#4A3A1C");
+                            setTimeout(() => run((i + 1) % APPS.length), REST);
+                        }, DWELL);
+                    });
+                }, HOLD);
+            });
+        }
+
+        if (reduce) cards.forEach(c => c.classList.add("live"));
+        else setTimeout(() => run(0), 900);
+
+        const stg = document.getElementById("stage");
+        function fit() {
+            // uniform scale only - a non-uniform one would squash the ring back into an ellipse
+            const s = Math.min(innerWidth / 1600, innerHeight / 900);
+            // spend any vertical slack on the stage itself so the bands reach the real edges
+            const h = Math.max(900, Math.round(innerHeight / s));
+            stg.style.setProperty("--stage-h", h + "px");
+            stg.style.transform = "translate(-50%,-50%) scale(" + s + ")";
+        }
+        addEventListener("resize", fit); fit();
+
+        let idle;
+        function wake() {
+            document.body.classList.remove("idle");
+            clearTimeout(idle);
+            idle = setTimeout(() => document.body.classList.add("idle"), 2500);
+        }
+        addEventListener("mousemove", wake); wake();
+        addEventListener("keydown", e => {
+            if (e.key.toLowerCase() === "f") {
+                document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+            }
+        });
+    </script>
+</body>
+
+</html>
